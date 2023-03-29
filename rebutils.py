@@ -2,6 +2,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 from scipy.integrate import solve_ivp
 from scipy.stats.distributions import t
+import statsmodels.api as sm
 import math
 
 def fitNLSR(beta_guess, x, y_meas, calcY, use_rel_error):
@@ -35,48 +36,42 @@ def fitNLSR(beta_guess, x, y_meas, calcY, use_rel_error):
         beta_ci[i,1] = beta[i] + beta_cov[i,i]**0.5*t_val
     return beta, beta_ci, r_squared
 
-def fit_Arrhenius_expression_to_data(k, T, R):
+def fitLinSR(x, y, model_has_intercept):
+    # define x
+    if model_has_intercept:
+        x=sm.add_constant(x)
+    
+    # defing the model and fit it to the data
+    model = sm.OLS(y,x)
+    res = model.fit()
+
+    # return the results
+    return res.params, res.conf_int(alpha=0.05), res.rsquared
+
+def fit_Arrhenius_model(k,T,R):
     # T must be in absolute units and R must be in terms of the same temperature
     # units and whatever energy units are desired.
 
-    # get the number of data
-    n_data = len(k)
+    # define x and y
+    x = -1/R/T
+    x = sm.add_constant(x)
+    y = np.log(k)
 
-    # create a matrix with x (-1/R/T) in the first column and 1's in the second
-    x = np.transpose(np.array([-1/R/T, np.ones(n_data)]))
+    # define the model and fit it to the data
+    model = sm.OLS(y,x)
+    res = model.fit()
 
-    # create an array with ln(k)
-    y_meas = np.log(k)
+    # get the raw results
+    beta = res.params
+    r_squared = res.rsquared
+    beta_ci = res.conf_int(alpha=0.05)
 
-    # calculate the parameters
-    t1 = np.transpose(x)
-    x1 = np.linalg.inv(np.matmul(t1,x))
-    x2 = np.matmul(x1,t1)
-    beta = np.matmul(x2,y_meas)
+    # process the results
+    beta[0] = np.exp(beta[0])
+    beta_ci[0,0] = np.exp(beta_ci[0,0])
+    beta_ci[0,1] = np.exp(beta_ci[0,1])
 
-    # calculate the model-predicted responses
-    y_pred = np.matmul(x,beta)
-
-    # calculate r_squared
-    y_mean = np.mean(y_meas)
-    ss_res = np.sum((y_meas - y_pred)**2)
-    ss_tot = np.sum((y_meas - y_mean)**2)
-    r_squared = 1 - ss_res/ss_tot
-
-    # calculate the 95% confidence intervals
-    beta_ci = np.zeros((len(beta),2))
-    eps = y_meas - y_pred
-    var_eps = 1/(n_data - 2)*(np.matmul(np.transpose(eps),eps))
-    covar_beta = var_eps*np.linalg.inv(np.matmul(t1,x))
-    t_critical = t.ppf(0.975,n_data - 2)
-    for i, p in enumerate(beta):
-        beta_ci[i,0] = beta[i] - covar_beta[i,i]**0.5*t_critical
-        beta_ci[i,1] = beta[i] + covar_beta[i,i]**0.5*t_critical
-
-    # convert from ln(k0) to k0
-    beta[1] = math.e**(beta[1])
-    beta_ci[1,0] = math.e**(beta_ci[1,0])
-    beta_ci[1,1] = math.e**(beta_ci[1,1])
+    # return the results
     return beta, beta_ci, r_squared
 
 def solveIVODEs(ind0, dep0, f_var, f_val, ODE_fcn, odes_are_stiff=False):
