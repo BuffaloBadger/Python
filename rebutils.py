@@ -13,17 +13,14 @@ def fitNLSR(beta_guess, x, y_meas, calcY, use_rel_error):
         weight = np.ones(len(y_meas))
     
     # estimate the parameters
-    beta, beta_cov, info, mesg, ier = curve_fit(calcY, x, y_meas, p0=beta_guess, sigma=weight,
-        full_output=True)
+    beta, beta_cov, info, mesg, ier = curve_fit(calcY, x, y_meas, p0=beta_guess,
+            sigma=weight, method = 'trf', full_output=True)
 
     # calculate r_squared
-    y_pred = info['fvec']
-    # I originally had the following line; don't know where it came from, but it
-    # seems to be wornk
-    #y_pred = info['fvec']*y_meas + y_meas
+    y_pred = info['fvec'] + y_meas
     y_mean = np.mean(y_meas)
-    ss_res = np.sum((y_meas - y_pred)**2)
-    ss_tot = np.sum((y_meas - y_mean)**2)
+    ss_res = np.sum(np.square(y_meas - y_pred))
+    ss_tot = np.sum(np.square(y_meas - y_mean))
     r_squared = 1 - ss_res/ss_tot
 
     # calculate 95% confidence interval
