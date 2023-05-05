@@ -80,10 +80,11 @@ def solveIVODEs(ind0, dep0, f_var, f_val, ODE_fcn, odes_are_stiff=False):
     if f_var == 0:
         # do not use the event
         ind = (ind0, f_val)
+        ind_eval = np.linspace(ind0,f_val,num=100)
         if odes_are_stiff:
-            res = solve_ivp(ODE_fcn, ind, dep0, method='LSODA')
+            res = solve_ivp(ODE_fcn, ind, dep0, method='LSODA', t_eval=ind_eval)
         else:
-            res = solve_ivp(ODE_fcn, ind, dep0, method='RK45')
+            res = solve_ivp(ODE_fcn, ind, dep0, method='RK45', t_eval=ind_eval)
     else:
         # use the event
         solved = False
@@ -91,11 +92,14 @@ def solveIVODEs(ind0, dep0, f_var, f_val, ODE_fcn, odes_are_stiff=False):
         ind_f = ind0 + 1.0
         while (count < 10 and not solved):
             ind = (ind0, ind_f)
+            ind_eval = np.linspace(ind0,ind_f,num=100)
             count += 1
             if odes_are_stiff:
-                res = solve_ivp(ODE_fcn, ind, dep0, method='LSODA', events=event)
+                res = solve_ivp(ODE_fcn, ind, dep0, method='LSODA',\
+                        t_eval=ind_eval, events=event)
             else:
-                res = solve_ivp(ODE_fcn, ind, dep0, method='RK45',events=event)
+                res = solve_ivp(ODE_fcn, ind, dep0, method='RK45',\
+                        t_eval=ind_eval, events=event)
             if res.t[-1] == ind_f: # ind_f was not large enough
                 ind_f = (ind0 + 1.0)*10**count
             elif res.t[-1] < 0.1*ind_f: # ind_f was too large
